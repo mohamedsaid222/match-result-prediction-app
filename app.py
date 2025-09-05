@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 
 # ======================
 # Load Data
@@ -18,7 +17,8 @@ st.title("⚽ Match Result Prediction App")
 # Team Selection
 # ======================
 teams = pd.concat([df['home_team'], df['away_team']]).unique()
-team = st.selectbox("اختر الفريق", sorted(teams))
+home_team = st.selectbox("اختر الفريق المستضيف (Home)", sorted(teams))
+away_team = st.selectbox("اختر الفريق الضيف (Away)", sorted(teams))
 
 # ======================
 # Last 5 Matches Functions
@@ -36,28 +36,38 @@ def result_for(team, row):
         return 'Draw'
 
 # ======================
-# Display Stats
+# Display Stats for Both Teams
 # ======================
-if team:
-    st.subheader(f"📊 Last 5 Matches for {team}")
+if home_team and away_team and home_team != away_team:
+    col1, col2 = st.columns(2)
 
-    recent = last_five_matches(team, df).copy()
-    recent['Result'] = recent.apply(lambda x: result_for(team, x), axis=1)
+    # Home team stats
+    with col1:
+        st.subheader(f"🏠 {home_team} - Last 5 Matches")
+        recent_home = last_five_matches(home_team, df).copy()
+        recent_home['Result'] = recent_home.apply(lambda x: result_for(home_team, x), axis=1)
 
-    # جدول آخر 5 مباريات
-    st.write("### Last 5 Results")
-    st.table(recent[['date', 'home_team', 'away_team', 'home_score', 'away_score', 'Result']])
+        st.table(recent_home[['date', 'home_team', 'away_team', 'home_score', 'away_score', 'Result']])
+        summary_home = recent_home['Result'].value_counts()
+        st.write("Summary")
+        st.write(summary_home.to_frame().T)
+        st.bar_chart(summary_home)
 
-    # ملخص (عدد فوز/تعادل/خسارة)
-    summary = recent['Result'].value_counts()
-    st.write("### Summary of Last 5 Matches")
-    st.write(summary.to_frame().T)
+    # Away team stats
+    with col2:
+        st.subheader(f"✈️ {away_team} - Last 5 Matches")
+        recent_away = last_five_matches(away_team, df).copy()
+        recent_away['Result'] = recent_away.apply(lambda x: result_for(away_team, x), axis=1)
 
-    # رسم بياني
-    st.write("### Visualization")
-    st.bar_chart(summary)
+        st.table(recent_away[['date', 'home_team', 'away_team', 'home_score', 'away_score', 'Result']])
+        summary_away = recent_away['Result'].value_counts()
+        st.write("Summary")
+        st.write(summary_away.to_frame().T)
+        st.bar_chart(summary_away)
 
 # ======================
 # TODO: Add your Prediction Model Code here
 # ======================
-st.write("🔮 Prediction model will appear here...")
+if home_team and away_team and home_team != away_team:
+    st.write(f"🔮 Prediction model will calculate outcome for **{home_team} vs {away_team}** ...")
+
