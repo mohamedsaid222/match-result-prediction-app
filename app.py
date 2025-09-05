@@ -1,62 +1,63 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import LabelEncoder
-from sklearn.ensemble import RandomForestClassifier
 
-# =======================
-# 1. Load & Train Model
-# =======================
-@st.cache_resource
-def load_and_train():
-    df = pd.read_csv("results.csv")
+# ======================
+# Load Data
+# ======================
+@st.cache_data
+def load_data():
+    df = pd.read_csv("results.csv", parse_dates=['date'])
+    return df
 
-    # Create match result column
-    def match_result(row):
-        if row['home_score'] > row['away_score']:
-            return "Home Win"
-        elif row['home_score'] < row['away_score']:
-            return "Away Win"
-        else:
-            return "Draw"
+df = load_data()
 
-    df['result'] = df.apply(match_result, axis=1)
+st.title("⚽ Match Result Prediction App")
 
-    # Encode teams
-    home_encoder = LabelEncoder()
-    away_encoder = LabelEncoder()
-    df['home_team_enc'] = home_encoder.fit_transform(df['home_team'])
-    df['away_team_enc'] = away_encoder.fit_transform(df['away_team'])
+# ======================
+# Team Selection
+# ======================
+teams = pd.concat([df['home_team'], df['away_team']]).unique()
+team = st.selectbox("اختر الفريق", sorted(teams))
 
-    X = df[['home_team_enc', 'away_team_enc']]
-    y = df['result']
+# ======================
+# Last 5 Matches Functions
+# ======================
+def last_five_matches(team, df):
+    team_matches = df[(df['home_team'] == team) | (df['away_team'] == team)]
+    return team_matches.sort_values('date', ascending=False).head(5)
 
-    model = RandomForestClassifier(n_estimators=200, random_state=42)
-    model.fit(X, y)
+def result_for(team, row):
+    if row['home_score'] > row['away_score']:
+        return 'Win' if row['home_team'] == team else 'Loss'
+    elif row['home_score'] < row['away_score']:
+        return 'Win' if row['away_team'] == team else 'Loss'
+    else:
+        return 'Draw'
 
-    return model, home_encoder, away_encoder, df
+# ======================
+# Display Stats
+# ======================
+if team:
+    st.subheader(f"📊 Last 5 Matches for {team}")
 
-model, home_encoder, away_encoder, df = load_and_train()
+    recent = last_five_matches(team, df).copy()
+    recent['Result'] = recent.apply(lambda x: result_for(team, x), axis=1)
 
-# =======================
-# 2. Streamlit UI
-# =======================
-st.title("⚽ Match Result Prediction")
-st.write("Enter two teams to predict the match outcome (Home / Away / Draw).")
+    # جدول آخر 5 مباريات
+    st.write("### Last 5 Results")
+    st.table(recent[['date', 'home_team', 'away_team', 'home_score', 'away_score', 'Result']])
 
-# Dropdowns for teams
-teams = sorted(df['home_team'].unique())
-home_team = st.selectbox("🏟️ Home Team", teams)
-away_team = st.selectbox("✈️ Away Team", teams)
+    # ملخص (عدد فوز/تعادل/خسارة)
+    summary = recent['Result'].value_counts()
+    st.write("### Summary of Last 5 Matches")
+    st.write(summary.to_frame().T)
 
-if st.button("Predict"):
-    home_encoded = home_encoder.transform([home_team])[0]
-    away_encoded = away_encoder.transform([away_team])[0]
+    # رسم بياني
+    st.write("### Visualization")
+    st.bar_chart(summary)
 
-    pred = model.predict([[home_encoded, away_encoded]])[0]
-    prob = model.predict_proba([[home_encoded, away_encoded]])[0]
-
-    st.success(f"Predicted Result: **{pred}**")
-    st.write("### Probabilities:")
-    for cls, p in zip(model.classes_, prob):
-        st.write(f"- {cls}: {p:.2f}")
+# ======================
+# TODO: Add your Prediction Model Code here
+# ======================
+st.write("🔮 Prediction model will appear here...")
